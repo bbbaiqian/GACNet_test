@@ -2,7 +2,9 @@
 """
 
 import numpy as np
-import tensorflow as tf
+import tensorflow as tf2
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 
 def variable_with_weight_decay(name, shape, wd, trainable=True):
   """Helper to create an initialized Variable with weight decay.
@@ -18,7 +20,9 @@ def variable_with_weight_decay(name, shape, wd, trainable=True):
   Returns:
     Variable Tensor
   """
-  var = tf.get_variable(name, shape=shape, dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer(), trainable=trainable)
+  # var = tf.get_variable(name, shape=shape, dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer(), trainable=trainable)
+  var = tf.get_variable(name, shape=shape, dtype=tf.float32, initializer=tf2.initializers.GlorotUniform(),
+                        trainable=trainable)
   if wd is not None:
     weight_decay = tf.multiply(tf.nn.l2_loss(var), wd, name='weight_loss')
     tf.add_to_collection('losses', weight_decay)
@@ -169,9 +173,13 @@ def dropout(inputs,
 
 def batch_norm(data, is_training, bn_decay, scope):
     decay = bn_decay if bn_decay is not None else 0.5
+    # return tf.layers.batch_normalization(data, momentum=decay, training=is_training,
+    #                                      beta_regularizer=tf.contrib.layers.l2_regularizer(scale=1.0),
+    #                                      gamma_regularizer=tf.contrib.layers.l2_regularizer(scale=1.0),
+    #                                      name=scope)
     return tf.layers.batch_normalization(data, momentum=decay, training=is_training,
-                                         beta_regularizer=tf.contrib.layers.l2_regularizer(scale=1.0),
-                                         gamma_regularizer=tf.contrib.layers.l2_regularizer(scale=1.0),
+                                         beta_regularizer=tf2.keras.regularizers.l2(1.0),
+                                         gamma_regularizer=tf2.keras.regularizers.l2(1.0),
                                          name=scope)
 
 

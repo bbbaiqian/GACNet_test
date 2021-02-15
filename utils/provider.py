@@ -145,7 +145,7 @@ def getDataFiles(list_filename):
 def load_h5(h5_filename):
     f = h5py.File(h5_filename)
     data = f['data'][:]
-    label = f['label'][:]
+    label = f['label_seg'][:]
     return (data, label)
 
 def loadDataFile(filename):

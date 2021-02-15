@@ -2,6 +2,9 @@
 
 import numpy as np
 import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
 import glob
 import pdb
 
@@ -15,6 +18,7 @@ sys.path.append(os.path.join(ROOT_DIR, 'utils'))
 import provider
 from model import *
 import tf_util
+from tqdm import tqdm
  
 
 def log_string(LOG_FOUT, out_str):
@@ -32,7 +36,7 @@ def train(args, graph_inf, net_inf):
 
     #load data
     # train_data, train_label, train_spw, test_data, test_label, test_spw = load_traindata(args.data_path, args.roomlist_file, args.test_area)
-    train_data, train_label, test_data, test_label = load_traindata(args.data_path)
+    train_data, train_label, test_data, test_label = load_traindata(args.data_path, args.use_lidar)
     feature_channel = train_data.shape[-1]
 
     with tf.Graph().as_default():
@@ -125,7 +129,7 @@ def train_one_epoch(args, sess, ops, train_writer, train_data, train_label, LOG_
     
     log_string(LOG_FOUT, '----')
     # current_data, current_label, current_spw, _ = provider.shuffle_data_with_spw(train_data[:,0:args.num_point,:], train_label, train_spw)
-    current_data, current_label, current_spw, _ = provider.shuffle_data(train_data[:, 0:args.num_point, :],
+    current_data, current_label, _ = provider.shuffle_data(train_data[:, 0:args.num_point, :],
                                                                                  train_label)
     current_data[:,:,0:3] = provider.rotate_point_cloud_along_z(current_data[:,:,0:3]) # rotate along z-axis
 
@@ -144,7 +148,7 @@ def train_one_epoch(args, sess, ops, train_writer, train_data, train_label, LOG_
         
         feed_dict = {ops['pointclouds_pl']: current_data[start_idx:end_idx, :, :],
                      ops['labels_pl']: current_label[start_idx:end_idx],
-                     ops['spws_pl']: current_spw[start_idx:end_idx],
+                     # ops['spws_pl']: current_spw[start_idx:end_idx],
                      ops['is_training_pl']: is_training,}
         summary, step, _, loss_val, pred_val = sess.run([ops['merged'], ops['step'], ops['train_op'], ops['loss'], ops['pred']],
                                                 feed_dict=feed_dict)
@@ -226,7 +230,7 @@ def eval_one_epoch(args, sess, ops, test_writer, test_data, test_label, LOG_FOUT
     return np.mean(iou_list)
         
 
-def load_traindata(data_path):
+def load_traindata(data_path, use_lidar=False):
     train_path = os.path.join(data_path, 'train')
     test_path = os.path.join(data_path, 'val')
     TRAIN_FILES = glob.glob(train_path + '/*.h5')
@@ -239,13 +243,15 @@ def load_traindata(data_path):
     data_batch_list = []
     label_batch_list = []
     spw_batch_list = []
-    for h5_filename in ALL_FILES:
+    for h5_filename in tqdm(ALL_FILES[:100], desc='Loading data'):
         data_batch, label_batch = provider.load_h5(h5_filename)
         data_batch_list.append(data_batch)
         label_batch_list.append(label_batch)
         # spw_batch_list.append(spw_batch)
-    data_batches = np.concatenate(data_batch_list, 0)
-    label_batches = np.concatenate(label_batch_list, 0)
+    # data_batches = np.concatenate(data_batch_list, 0)
+    # label_batches = np.concatenate(label_batch_list, 0)
+    data_batches = np.array(data_batch_list)
+    label_batches = np.array(label_batch_list)
     # spw_batches = np.concatenate(spw_batch_list, 0)
 
     # test_area = 'Area_'+str(test_area)
@@ -261,12 +267,17 @@ def load_traindata(data_path):
     #         test_idxs.append(i)
     #     else:
     #         train_idxs.append(i)
+    train_idxs = np.arange(0, 50)
+    test_idxs = np.arange(50, 100)
+    if use_lidar:
+        train_data = data_batches[train_idxs, :, :7]
+        test_data = data_batches[test_idxs, :, :7]
+    else:
+        train_data = data_batches[train_idxs, :, :6]
+        test_data = data_batches[test_idxs, :, :6]
 
-    train_data = data_batches[train_idxs,...]
     train_label = label_batches[train_idxs]
     # train_spw = spw_batches[train_idxs]
-
-    test_data = data_batches[test_idxs,...]
     test_label = label_batches[test_idxs]
     # test_spw = spw_batches[test_idxs]
     print(train_data.shape, train_label.shape)

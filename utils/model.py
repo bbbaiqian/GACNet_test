@@ -6,6 +6,8 @@ sys.path.append(BASE_DIR)
 sys.path.append(os.path.join(BASE_DIR, '../utils'))
 sys.path.append(os.path.join(BASE_DIR, '../tf_ops'))
 import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import numpy as np
 import tf_util
 from pcnet_util import build_graph, graph_coarse, graph_attention_layer, graph_pooling_layer, point_upsample_layer, crf_layer, graph_attention_layer_for_featurerefine

@@ -1,4 +1,6 @@
 import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import numpy as np
 import random
 from tf_ops import knn_search, three_interpolate, group_point, gather_point, FPS_downsample, query_ball_knn, shuffle_ids,query_ball
