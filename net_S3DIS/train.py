@@ -205,7 +205,7 @@ def eval_one_epoch(args, sess, ops, test_writer, test_data, test_label, LOG_FOUT
         # correct = np.sum((pred_val == batch_label) & (batch_spw>0))
         correct = np.sum((pred_val == batch_label))
         total_correct += correct
-        total_seen += args.num_point
+        total_seen += args.batch_size*args.num_point
         # total_seen += np.sum(batch_spw>0)
         loss_sum += (loss_val*args.batch_size)
         for i in range(start_idx, end_idx):
@@ -243,7 +243,7 @@ def load_traindata(data_path, use_lidar=False):
     data_batch_list = []
     label_batch_list = []
     spw_batch_list = []
-    for h5_filename in tqdm(ALL_FILES[:100], desc='Loading data'):
+    for h5_filename in tqdm(ALL_FILES, desc='Loading data'):
         data_batch, label_batch = provider.load_h5(h5_filename)
         data_batch_list.append(data_batch)
         label_batch_list.append(label_batch)
@@ -267,8 +267,9 @@ def load_traindata(data_path, use_lidar=False):
     #         test_idxs.append(i)
     #     else:
     #         train_idxs.append(i)
-    train_idxs = np.arange(0, 50)
-    test_idxs = np.arange(50, 100)
+
+    # train_idxs = np.arange(0, 50)
+    # test_idxs = np.arange(50, 100)
     if use_lidar:
         train_data = data_batches[train_idxs, :, :7]
         test_data = data_batches[test_idxs, :, :7]

@@ -233,3 +233,16 @@ def write_xyzL_ply(points, labels, filename, text=False):
     vertex = np.array(points, dtype=[('x', 'f4'), ('y', 'f4'),('z', 'f4'), ('label', 'u1')])
     el = PlyElement.describe(vertex, 'vertex', comments=['vertices'])
     PlyData([el], text=text).write(filename)
+
+
+##################################################################################################
+#########################   las io  utils
+##################################################################################################
+import laspy
+
+def read_xyzrgbIL_las(filename):
+    """ read XYZ point cloud from filename LAS file """
+    file = laspy.file.File(filename, mode='r')
+
+    pc_array = np.concatenate([file.x[:, None], file.y[:, None], file.z[:, None], file.Red[:, None], file.Green[:, None], file.Blue[:, None], file.intensity[:, None], file.Classification[:, None]], axis=1)
+    return pc_array

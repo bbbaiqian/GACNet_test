@@ -4,12 +4,13 @@ import test
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--gpu', type=int, default=0, help='GPU to use [default: GPU 0]')
-parser.add_argument('--log_dir', default='log_area5', help='Log dir [default: log]')
-parser.add_argument('--num_class', type=int, default=13, help='number of class')
-parser.add_argument('--channel', type=int, default=12, help='number of feature channel')
-parser.add_argument('--testdataset_dir', type=str, default='../Data/S3DIS/test_dataset', help='testdataset path')
-parser.add_argument('--test_dir', type=str, default='/media/wl/user/3D_pcseg_Data/S3DIS/stanford_indoor3d', help='The file contains original test data')
-parser.add_argument('--outdir', type=str, default='../Data/S3DIS/labels_pred_true')
+parser.add_argument('--log_dir', default='log', help='Log dir [default: log]')
+parser.add_argument('--num_class', type=int, default=9, help='number of class')
+parser.add_argument('--num_point', type=int, default=16384, help='Point number [default: 4096]')
+parser.add_argument('--channel', type=int, default=6, help='number of feature channel [default: 6]')
+parser.add_argument('--testdataset_dir', type=str, default='/mnt/cm-nas03/backup/students/qbai/Datasets/point_clouds/Hannover_AreaMapping_4_labeled_feat_type_h5/val', help='testdataset path')
+parser.add_argument('--test_dir', type=str, default='/mnt/cm-nas03/backup/students/qbai/Datasets/point_clouds/Hannover_AreaMapping_5_predicted/pred_files_val_feat', help='The file contains original test data')
+parser.add_argument('--outdir', type=str, default='/mnt/cm-nas03/backup/students/qbai/Datasets/point_clouds/Hannover_AreaMapping_5_predicted/GACNet/labels_pred_true')
 
 args = parser.parse_args()
 

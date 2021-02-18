@@ -7,6 +7,7 @@ import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 import glob
 import pdb
+from scipy.spatial import cKDTree
 
 import os
 import sys
@@ -57,31 +58,49 @@ def test(args, graph_inf, net_inf):
                }
 
         TEST_FILES = glob.glob(args.testdataset_dir + '/*.h5')
-        for i in range(len(TEST_FILES)):
+        for i in range(len(TEST_FILES)):  # predict block by block
             file_name = TEST_FILES[i]
             print(file_name+'\n')
             testset = h5py.File(file_name)
-            points = testset['data'][:] # (blocks_num, 4096, 12)
-            idx = testset['idx'][:]
-            mask = testset['mask'][:]
-            pts_num = testset['pts_num'][:]
-            
-            probs = []
-            start_id =0
-            end_id =0
-            for j in range(len(pts_num)):
-                end_id += pts_num[j]
-                current_data = points[start_id:end_id,:]
-                current_data = np.expand_dims(current_data, 0)
-                feed_dict = {ops['pointclouds_pl']: current_data,  ops['is_training_pl']: False}
-                current_probs = sess.run(ops['pred'], feed_dict=feed_dict)
-                probs.append(np.squeeze(current_probs, 0))
-                start_id += pts_num[j]
-            probs = np.concatenate(probs, 0)
-            probs = probs[mask,:]
-            idx = idx[mask]
+            points = testset['data'][:, :args.channel]  # (blocks_num, 4096, 12)  # Cyclomedia: (16384, 6)
+            # idx = testset['idx'][:]
+            # mask = testset['mask'][:]
+            # pts_num = testset['pts_num'][:]
+            pts_num = args.num_point
 
             out_filename = file_name.split('/')[-1].split('.')[0]
+
+            # search idx in the original point cloud:
+            points_search = testset['unnormalized_data'][:, :args.channel]
+            # load original point cloud
+            tmp_names = out_filename.split('_')
+            las_filename = '_'.join(tmp_names[:4])
+            org_pts = provider.read_xyzrgbIL_las(os.path.join(args.test_dir, las_filename + '.las'))
+            tree = cKDTree(org_pts[:, :3])
+            posi, nearest_idx = tree.query(np.concatenate([points_search[:, 0][:, None],points_search[:, 2][:, None],points_search[:, 1][:, None]], axis=1), k=[1])
+            idx = np.concatenate(nearest_idx)
+            
+            probs = []
+            # start_id =0
+            # end_id =0
+            # for j in range(len(pts_num)):
+            #     end_id += pts_num[j]
+            #     current_data = points[start_id:end_id,:]
+            #     current_data = np.expand_dims(current_data, 0)
+            #     feed_dict = {ops['pointclouds_pl']: current_data,  ops['is_training_pl']: False}
+            #     current_probs = sess.run(ops['pred'], feed_dict=feed_dict)
+            #     probs.append(np.squeeze(current_probs, 0))
+            #     start_id += pts_num[j]
+            # probs = np.concatenate(probs, 0)
+            # probs = probs[mask, :]
+            # idx = idx[mask]
+
+            current_data = points
+            current_data = np.expand_dims(current_data, 0)
+            feed_dict = {ops['pointclouds_pl']: current_data, ops['is_training_pl']: False}
+            current_probs = sess.run(ops['pred'], feed_dict=feed_dict)
+            probs = np.squeeze(current_probs, 0)
+
             save_h5_probs_idx(os.path.join(args.outdir, out_filename+'.h5'), probs, idx)
 
         sess.close()
@@ -101,13 +120,18 @@ def interpolate(args):
         print(filename)
 
         probs, idx = load_h5_probs_idx(os.path.join(args.outdir, filename+'.h5'))
-        org_pts = provider.read_xyzrgbL_ply( os.path.join(args.test_dir, filename+'.ply') )
-        true_label = org_pts[:,-1]
-        probs_whole = three_interpolate(org_pts, idx, probs, args.num_class)
-        pred_label = np.argmax(probs_whole, axis=-1)
+        tmp_names = filename.split('_')
+        las_filename = '_'.join(tmp_names[:4])
+        # org_pts = provider.read_xyzrgbL_ply( os.path.join(args.test_dir, filename+'.ply') )
+        org_pts = provider.read_xyzrgbIL_las(os.path.join(args.test_dir, las_filename + '.las'))
+        # true_label = org_pts[:, -1]
+        true_label = org_pts[idx, -1]
+        # probs_whole = three_interpolate(org_pts, idx, probs, args.num_class)
+        # pred_label = np.argmax(probs_whole, axis=-1)
+        pred_label = np.argmax(probs, axis=-1)
         pred_label = np.uint8(pred_label) 
 
-        save_labels_pred_true(os.path.join(args.outdir, filename+'_labels.pred_true'), pred_label, true_label)
+        save_labels_pred_true(os.path.join(args.outdir, filename+'_labels.pred_true'), idx, probs, pred_label, true_label)
 
         # only save the points without ceiling for vision efficiency
         idx_without_ceiling = np.where(true_label!=0)[0]
@@ -142,10 +166,11 @@ def load_h5_probs_idx(h5_filename):
     return probs, idx
 
 
-def save_labels_pred_true(filename, pred_label, true_label):
+def save_labels_pred_true(filename, idx, probs, pred_label, true_label):
     f = open(filename, 'w')
     for i in range(len(true_label)):
-        f.write('%f %f\n' % (pred_label[i], true_label[i])) 
+        f.write('%d %f %f %f %f %f %f %f %f %f %f %f\n'
+                % (idx[i], probs[i, 0], probs[i, 1], probs[i, 2], probs[i, 3], probs[i, 4], probs[i, 5], probs[i, 6], probs[i, 7], probs[i, 8], pred_label[i], true_label[i]))
     f.close()
 
 
@@ -183,7 +208,7 @@ def acc_report(args):
     result_files = glob.glob(os.path.join(args.outdir, '*.pred_true'))
     pred_true_labels_list = []
     for i in range(len(result_files)):
-        pred_true_labels_list.append(np.loadtxt(result_files[i]))
+        pred_true_labels_list.append(np.loadtxt(result_files[i])[:, -2:])
         print('%d/%d load'%(i, len(result_files)))
     pred_true_labels = np.concatenate(pred_true_labels_list, 0)
 
